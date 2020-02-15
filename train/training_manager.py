@@ -1,15 +1,17 @@
 # the training manager trains the given network
 import json
 import numpy as np
+import sys
+import os
 
-from ..networks.net import Network
+sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+from networks.net import Network
 from replay_memory import ReplayMemory, ReplayMemoryConfig
 
 
 class TrainingManager(object):
     def __init__(self, config_json: str):
         self.training_config = json.load(open(config_json, "r"))
-        self.is_initialised = True
         self.replay_memory = ReplayMemory(
             ReplayMemoryConfig(
                 buffer_size=self.training_config["buffer_size"],
@@ -18,7 +20,7 @@ class TrainingManager(object):
             )
         )
 
-    def train(self, net: Network, env: Env):
+    def train(self, net: Network, env):
         """ trains the given network using RL """
 
         # create multiple episodes
@@ -46,6 +48,8 @@ class TrainingManager(object):
 
                 # generate batch of samples for training
                 batch = self.replay_memory.generate_batch()
+                if len(batch) < self.training_config["batch_size"]:
+                    continue
 
                 # update policy
                 net.train(batch)

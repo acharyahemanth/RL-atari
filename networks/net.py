@@ -1,5 +1,5 @@
 import numpy as np
-from typing import NamedTuple
+from typing import NamedTuple, List
 from abc import ABC, abstractmethod
 
 
@@ -14,6 +14,10 @@ class TrainingSample(NamedTuple):
 
 class Network(ABC):
     """ Base class for all networks """
+
+    @abstractmethod
+    def init(self, num_actions: int, discount_factor: float):
+        assert False
 
     @abstractmethod
     def predict(self, state: List[np.ndarray]):

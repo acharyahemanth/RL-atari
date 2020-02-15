@@ -1,8 +1,10 @@
 import numpy as np
 from collections import deque
 from typing import NamedTuple
+import sys, os
 
-from ..networks import TrainingSample
+sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+from networks.net import TrainingSample
 
 
 class ReplayMemoryConfig(NamedTuple):

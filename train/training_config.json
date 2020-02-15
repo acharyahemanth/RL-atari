@@ -1,0 +1,7 @@
+{
+    "buffer_size": 100,
+    "state_size": 4,
+    "batch_size": 25,
+    "num_episodes": 100,
+    "epsilon": 0.5
+}

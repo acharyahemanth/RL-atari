@@ -1,22 +1,23 @@
 import numpy as np
 import keras
+from typing import NamedTuple, List
 
-from net import TrainingSample
-from net import Network
+from .net import TrainingSample
+from .net import Network
 
 
 class KerasNetwork(Network):
     def __init__(self):
         self.model = None
 
-    def init(self, num_outputs: int, discount_factor: float):
+    def init(self, num_actions: int, discount_factor: float):
         """ sets up the keras model """
 
         self.num_outputs = num_actions
         self.discount_factor = discount_factor
-        self.model = self.model()
+        self.model = self.create_model()
 
-    def model(self):
+    def create_model(self):
         """ 
         Builds a keras model of the network
         Network architecture : 
@@ -43,7 +44,7 @@ class KerasNetwork(Network):
         )
 
         # flatten before adding dense layers
-        model.add(keras.layers.flatten())
+        model.add(keras.layers.Flatten())
 
         # dense layer
         model.add(keras.layers.Dense(units=256, activation="relu", use_bias=True,))
@@ -58,9 +59,10 @@ class KerasNetwork(Network):
         # compile model (i.e define optimizer, cost functions etc)
         model.compile(optimizer="rmsprop", loss="mse")
 
+        print("Keras model building success!!!")
+
         return model
 
-    @override
     def train(self, batch: List[TrainingSample]):
         """ trains the network using the batch of samples """
 
@@ -79,7 +81,6 @@ class KerasNetwork(Network):
             x=curr_states, y=expected_output, batch_size=len(batch), epochs=1
         )
 
-    @override
     def predict(self, state: List[np.ndarray]):
         return self.model.predict(
             x=state,
