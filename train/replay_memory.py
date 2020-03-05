@@ -28,8 +28,11 @@ class RingBufferElement:
     done: bool = False  # was terminal state
 
 
+# TODO : clean this up : assumes image dimensions
 def preprocess_image(img):
-    return np.uint8(cv2.cvtColor(np.uint8(img), cv2.COLOR_RGB2GRAY))
+    gray_img = np.uint8(cv2.cvtColor(np.uint8(img), cv2.COLOR_RGB2GRAY))
+    gray_img = gray_img[34:194, :]
+    return cv2.resize(gray_img, (80, 80))
 
 
 def save_batch(batch, batch_idx, op_folder, state_size):
