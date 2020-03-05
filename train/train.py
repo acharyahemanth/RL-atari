@@ -16,7 +16,6 @@ pong_env = gym.make("Pong-v0")
 
 # create network
 net = KerasNetwork()
-net.init(2, discount_factor=0.9)
 
 # create training manager
 tm = TrainingManager(os.path.join(dirpath, "training_config.json"))

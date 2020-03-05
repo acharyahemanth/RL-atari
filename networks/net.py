@@ -1,27 +1,31 @@
 import numpy as np
-from typing import NamedTuple, List
+from typing import List, Tuple
+from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
 
-class TrainingSample(NamedTuple):
+@dataclass
+class TrainingSample:
     """ Sample for training """
 
-    current_state: np.ndarray  # set of images concatenated along axis-2 (h x w x n)
-    action: int  # action taken by network for current_state
-    reward: float  # reward rxd for action
-    next_state: np.ndarray  # next state after taking action
+    current_state: np.ndarray = np.array(
+        []
+    )  # set of images concatenated along axis-2 (h x w x n)
+    action: int = -1  # action taken by network for current_state
+    reward: float = 0  # reward rxd for action
+    next_state: np.ndarray = np.array([])  # next state after taking action
 
 
 class Network(ABC):
     """ Base class for all networks """
 
     @abstractmethod
-    def init(self, num_actions: int, discount_factor: float):
+    def init(self, input_shape: Tuple[int], num_actions: int, discount_factor: float):
         assert False
 
     @abstractmethod
-    def predict(self, state: List[np.ndarray]):
-        """ returns np.ndarray of actions """  # TODO : mention shape here!
+    def predict(self, state: List[np.ndarray], predict_all_actions=False):
+        """ if predict_all_actions is true, it returns the output of the network directly (np.ndarray(num_actions), else it returns a single number corresponding to the action with the largest Q value)"""
         assert False
 
     @abstractmethod

@@ -1,5 +1,6 @@
 import gym
 import numpy as np
+import skimage.io
 
 
 def test_pong():
@@ -9,12 +10,15 @@ def test_pong():
         f"is.shape : {initial_state.shape}, type(is) : {np.array(initial_state).dtype}"
     )
     done = False
+    frame_cnt = 1
     while not done:
-        env.render()
+        # env.render()
         img, reward, done, info = env.step(
             env.action_space.sample()
         )  # take a random action
         print(f"reward : {reward}, done : {done}")
+        skimage.io.imsave(f"img_{frame_cnt}.png", img)
+        frame_cnt += 1
     env.close()
 
 
