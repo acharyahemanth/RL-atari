@@ -1,22 +1,46 @@
 import numpy as np
-import keras
+import tensorflow.keras as keras
+from keras.callbacks.callbacks import Callback
 from typing import NamedTuple, List, Tuple
+import os
+import tensorflow as tf
 
 from .net import TrainingSample
 from .net import Network
+
+
+class KerasCallBack(Callback):
+    """ called by model.fit() and writes out loss values to the tblogs """
+
+    def __init__(self, batch_idx, writer):
+        super().__init__()
+        self.batch_idx = batch_idx
+        self.writer = writer
+
+    def on_epoch_end(self, epoch, logs):
+        with self.writer.as_default():
+            tf.summary.scalar("loss", logs["loss"], step=self.batch_idx)
+            self.writer.flush()
 
 
 class KerasNetwork(Network):
     def __init__(self):
         self.model = None
 
-    def init(self, input_shape: Tuple[int], num_actions: int, discount_factor: float):
+    def init(
+        self,
+        input_shape: Tuple[int],
+        num_actions: int,
+        discount_factor: float,
+        tb_logdir: str,
+    ):
         """ sets up the keras model """
 
         self.num_outputs = num_actions
         self.discount_factor = discount_factor
         self.input_shape = input_shape
         self.model = self.create_model()
+        self.writer = tf.summary.create_file_writer(tb_logdir)
 
     def create_model(self):
         """ 
@@ -62,10 +86,11 @@ class KerasNetwork(Network):
         model.compile(optimizer="rmsprop", loss="mse")
 
         print("Keras model building success!!!")
+        model.summary()
 
         return model
 
-    def train(self, batch: List[TrainingSample]):
+    def train(self, batch_idx: int, batch: List[TrainingSample]):
         """ trains the network using the batch of samples """
 
         # evaluate q function for input samples (i.e expected network output) --------------
@@ -78,9 +103,17 @@ class KerasNetwork(Network):
             max_q = np.max(qn)
             qc[np.where(qn == max_q)] = x.reward + self.discount_factor * max_q
 
+        callback = KerasCallBack(batch_idx, self.writer)
+
         # update weights
         curr_states = np.stack([v.current_state for v in batch], axis=0)
-        self.model.fit(x=curr_states, y=q_curr, batch_size=len(batch), epochs=1)
+        self.model.fit(
+            x=curr_states,
+            y=q_curr,
+            batch_size=len(batch),
+            epochs=1,
+            callbacks=[callback],
+        )
 
     def predict(self, state: List[np.ndarray], predict_all_actions=False):
         nw_op = self.model.predict(x=state, batch_size=state.shape[0])
@@ -88,3 +121,6 @@ class KerasNetwork(Network):
             return nw_op
 
         return np.argmax(nw_op)
+
+    def save(self, chkpt_folder, epi_cnt):
+        self.model.save_weights(os.path.join(chkpt_folder, f"checkpoint_{epi_cnt}"))

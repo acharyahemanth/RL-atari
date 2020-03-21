@@ -20,7 +20,13 @@ class Network(ABC):
     """ Base class for all networks """
 
     @abstractmethod
-    def init(self, input_shape: Tuple[int], num_actions: int, discount_factor: float):
+    def init(
+        self,
+        input_shape: Tuple[int],
+        num_actions: int,
+        discount_factor: float,
+        tb_logdir: str,
+    ):
         assert False
 
     @abstractmethod
@@ -29,5 +35,10 @@ class Network(ABC):
         assert False
 
     @abstractmethod
-    def train(self, batch: List[TrainingSample]):
+    def train(self, batch_idx: int, batch: List[TrainingSample]):
+        assert False
+
+    @abstractmethod
+    def save(self, chkpt_folder, epi_cnt):
+        """ saves the checkpoint """
         assert False

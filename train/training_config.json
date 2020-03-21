@@ -1,10 +1,22 @@
 {
-    "buffer_size": 100,
-    "state_size": 4,
-    "batch_size": 5,
-    "num_episodes": 100,
-    "epsilon": 0.5,
-    "input_shape": "80,80,4",
-    "discount_factor": 0.9,
-    "enable_debug_mode": "False"
+    "training" : 
+    {
+        "batch_size": 5,
+        "num_episodes": 100,
+        "epsilon": 0.5,    
+        "discount_factor": 0.9
+    },
+    "replay_buffer":
+    {
+        "buffer_size": 100,
+        "state_size": 4,
+        "input_shape": "80,80,4"
+    },
+    "outputs" :
+    {
+        "output_folder": "../outputs",
+        "dump_training_samples": "False",
+        "save_weights": "False",
+        "weights_dump_episode_frequency": 10
+    }
 }

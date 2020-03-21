@@ -14,29 +14,54 @@ from replay_memory import ReplayMemory, ReplayMemoryConfig
 class TrainingManager(object):
     def __init__(self, config_json: str):
         self.training_config = json.load(open(config_json, "r"))
-        self.training_config["input_shape"] = tuple(
-            [int(v) for v in (self.training_config["input_shape"].split(","))]
+        self.training_config["replay_buffer"]["input_shape"] = tuple(
+            [
+                int(v)
+                for v in (
+                    self.training_config["replay_buffer"]["input_shape"].split(",")
+                )
+            ]
         )
-        self.training_config["enable_debug_mode"] = (
-            self.training_config["enable_debug_mode"] == "True"
+        self.training_config["outputs"]["dump_training_samples"] = (
+            self.training_config["outputs"]["dump_training_samples"] == "True"
+        )
+        self.training_config["outputs"]["save_weights"] = (
+            self.training_config["outputs"]["save_weights"] == "True"
         )
 
-        # create folder to dump out debug images
-        self.dbg_folder = "./dbg_imgs"
-        if self.training_config["enable_debug_mode"]:
-            if os.path.exists(self.dbg_folder):
-                print(f"deleting contents of {self.dbg_folder}...")
-                shutil.rmtree(self.dbg_folder)
-            os.mkdir(self.dbg_folder)
+        # create folder to dump out debug data
+        if os.path.exists(self.training_config["outputs"]["output_folder"]):
+            shutil.rmtree(self.training_config["outputs"]["output_folder"])
+        os.mkdir(self.training_config["outputs"]["output_folder"])
+
+        self.output_folders = {}
+        if self.training_config["outputs"]["dump_training_samples"]:
+            self.output_folders["training_samples"] = os.path.join(
+                self.training_config["outputs"]["output_folder"], "training_samples"
+            )
+            os.mkdir(self.output_folders["training_samples"])
+
+        # dump tensorboard logs
+        self.output_folders["tb_logs"] = os.path.join(
+            self.training_config["outputs"]["output_folder"], "tb_logs"
+        )
+        os.mkdir(self.output_folders["tb_logs"])
+
+        # create folder to dump checkpoints
+        if self.training_config["outputs"]["save_weights"]:
+            self.output_folders["weights"] = os.path.join(
+                self.training_config["outputs"]["output_folder"], "weights"
+            )
+            os.mkdir(self.output_folders["weights"])
 
         # create replay memory
         self.replay_memory = ReplayMemory(
             ReplayMemoryConfig(
-                buffer_size=self.training_config["buffer_size"],
-                state_size=self.training_config["state_size"],
-                batch_size=self.training_config["batch_size"],
-                dbg_folder_path=self.dbg_folder
-                if self.training_config["enable_debug_mode"]
+                buffer_size=self.training_config["replay_buffer"]["buffer_size"],
+                state_size=self.training_config["replay_buffer"]["state_size"],
+                batch_size=self.training_config["training"]["batch_size"],
+                dbg_folder_path=self.output_folders["training_samples"]
+                if self.training_config["outputs"]["dump_training_samples"]
                 else None,
             )
         )
@@ -45,19 +70,21 @@ class TrainingManager(object):
         """ trains the given network using RL """
         # initialise the network
         net.init(
-            self.training_config["input_shape"],
+            self.training_config["replay_buffer"]["input_shape"],
             2,
-            self.training_config["discount_factor"],
+            self.training_config["training"]["discount_factor"],
+            self.output_folders["tb_logs"],
         )
 
         # training batch index
         batch_idx = 0
 
         # create multiple episodes
-        for epi_cnt in range(0, self.training_config["num_episodes"]):
+        for epi_cnt in range(0, self.training_config["training"]["num_episodes"]):
+            print(f"Playing episode {epi_cnt}............................")
             next_img = env.reset()
             done = False
-            eps = self.training_config["epsilon"]
+            eps = self.training_config["training"]["epsilon"]
 
             # play a game
             while not done:
@@ -70,7 +97,7 @@ class TrainingManager(object):
                 else:
                     action = env.action_space.sample()
 
-                # generate reward for current action as well as the next state
+                # generate regward for current action as well as the next state
                 next_img, reward, done, info = env.step(action)
 
                 # update replace memory with next image and reward
@@ -78,15 +105,20 @@ class TrainingManager(object):
 
                 # generate batch of samples for training
                 batch = self.replay_memory.generate_batch(batch_idx)
-                if len(batch) < self.training_config["batch_size"]:
+                if len(batch) < self.training_config["training"]["batch_size"]:
                     continue
                 batch_idx += 1
 
                 # update policy
-                net.train(batch)
+                net.train(batch_idx, batch)
 
-            # if(epi_cnt % self.training_config['checkpoint_dump_frequency']==0):
-            #     net.save()
+            if (
+                self.training_config["outputs"]["save_weights"]
+                and epi_cnt
+                % self.training_config["outputs"]["weights_dump_episode_frequency"]
+                == 0
+            ):
+                net.save(self.output_folders["weights"], epi_cnt)
 
             # if(epi_cnt % self.training_config['eval_frequency']==0):
             #     net.evaluate(env)
