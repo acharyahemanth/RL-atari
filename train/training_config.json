@@ -1,14 +1,18 @@
 {
     "training" : 
     {
-        "batch_size": 5,
+        "batch_size": 32,
         "num_episodes": 100,
-        "epsilon": 0.5,    
+        "epsilon_strategy": {
+            "start_val":1.0,
+            "end_val":0.1,
+            "end_batch":1000
+        },  
         "discount_factor": 0.9
     },
     "replay_buffer":
     {
-        "buffer_size": 100,
+        "buffer_size": 250,
         "state_size": 4,
         "input_shape": "80,80,4"
     },
