@@ -112,12 +112,14 @@ class ReplayMemory(object):
             )
             ts.action = self._ring_buffer[idx].action
             ts.reward = self._ring_buffer[idx].reward
-            ts.next_state = np.dstack(
-                [
-                    self._ring_buffer[i].img
-                    for i in range(idx + 1 - self._config.state_size, idx + 1)
-                ]
-            )
+            ts.last_episode_state = self._ring_buffer[idx].done
+            if not self._ring_buffer[idx].done:
+                ts.next_state = np.dstack(
+                    [
+                        self._ring_buffer[i].img
+                        for i in range(idx + 1 - self._config.state_size, idx + 1)
+                    ]
+                )
             return ts
 
         # generate random indices from state_size-1 : buffersize-state_size

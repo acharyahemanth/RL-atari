@@ -21,4 +21,4 @@ net = KerasNetwork()
 tm = TrainingManager(os.path.join(dirpath, "training_config.json"))
 
 # train
-tm.train(net, pong_env)
+tm.train(net, pong_env, [2, 3])  # 2-> paddle up, 3 -> paddle down

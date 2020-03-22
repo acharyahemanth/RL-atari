@@ -5,6 +5,7 @@ import sys
 import os
 import skimage.io
 import shutil
+import tensorflow as tf
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from networks.net import Network
@@ -46,6 +47,7 @@ class TrainingManager(object):
             self.training_config["outputs"]["output_folder"], "tb_logs"
         )
         os.mkdir(self.output_folders["tb_logs"])
+        self.writer = tf.summary.create_file_writer(self.output_folders["tb_logs"])
 
         # create folder to dump checkpoints
         if self.training_config["outputs"]["save_weights"]:
@@ -66,36 +68,53 @@ class TrainingManager(object):
             )
         )
 
-    def train(self, net, env):
+    def train(self, net, env, env_action_space):
         """ trains the given network using RL """
+
         # initialise the network
         net.init(
             self.training_config["replay_buffer"]["input_shape"],
             2,
             self.training_config["training"]["discount_factor"],
             self.output_folders["tb_logs"],
+            env_action_space,
+            self.writer,
         )
 
         # training batch index
         batch_idx = 0
+
+        def get_eps(batch_idx):
+            """ given a batch index, returns the epsilon for greedy exploration"""
+            ratio = min(
+                1,
+                batch_idx
+                / self.training_config["training"]["epsilon_strategy"]["end_batch"],
+            )
+            eps = (1 - ratio) * self.training_config["training"]["epsilon_strategy"][
+                "start_val"
+            ] + ratio * self.training_config["training"]["epsilon_strategy"]["end_val"]
+            with self.writer.as_default():
+                tf.summary.scalar("epsilon", eps, step=batch_idx)
+            return eps
 
         # create multiple episodes
         for epi_cnt in range(0, self.training_config["training"]["num_episodes"]):
             print(f"Playing episode {epi_cnt}............................")
             next_img = env.reset()
             done = False
-            eps = self.training_config["training"]["epsilon"]
 
             # play a game
             while not done:
+
                 # generate next state
                 state = self.replay_memory.gen_next_state(next_img)
 
                 # generate action using epsilon-greedy strategy
-                if state is not None and np.random.rand() > eps:
+                if state is not None and np.random.rand() > get_eps(batch_idx):
                     action = net.predict(np.expand_dims(state, axis=0))
                 else:
-                    action = env.action_space.sample()
+                    action = np.random.choice(env_action_space)
 
                 # generate regward for current action as well as the next state
                 next_img, reward, done, info = env.step(action)
@@ -111,6 +130,9 @@ class TrainingManager(object):
 
                 # update policy
                 net.train(batch_idx, batch)
+
+                with self.writer.as_default():
+                    self.writer.flush()
 
             if (
                 self.training_config["outputs"]["save_weights"]

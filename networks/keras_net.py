@@ -9,7 +9,7 @@ from .net import TrainingSample
 from .net import Network
 
 
-class KerasCallBack(Callback):
+class KerasTBCallBack(Callback):
     """ called by model.fit() and writes out loss values to the tblogs """
 
     def __init__(self, batch_idx, writer):
@@ -20,7 +20,6 @@ class KerasCallBack(Callback):
     def on_epoch_end(self, epoch, logs):
         with self.writer.as_default():
             tf.summary.scalar("loss", logs["loss"], step=self.batch_idx)
-            self.writer.flush()
 
 
 class KerasNetwork(Network):
@@ -33,6 +32,8 @@ class KerasNetwork(Network):
         num_actions: int,
         discount_factor: float,
         tb_logdir: str,
+        env_action_space: List[int],
+        tb_writer,
     ):
         """ sets up the keras model """
 
@@ -40,7 +41,13 @@ class KerasNetwork(Network):
         self.discount_factor = discount_factor
         self.input_shape = input_shape
         self.model = self.create_model()
-        self.writer = tf.summary.create_file_writer(tb_logdir)
+        self.writer = tb_writer
+        self.env_action_space = (
+            env_action_space  # ith nn_output maps to env_action_space[i]
+        )
+        self.openaiaction_to_nn_output = {}
+        for idx, action in enumerate(self.env_action_space):
+            self.openaiaction_to_nn_output[action] = idx
 
     def create_model(self):
         """ 
@@ -97,13 +104,25 @@ class KerasNetwork(Network):
         # TODO : this is inefficient, save current q_curr if current state has been run through the nw
         curr_states = np.stack([v.current_state for v in batch], axis=0)
         next_states = np.stack([v.next_state for v in batch], axis=0)
-        q_curr = self.predict(curr_states, predict_all_actions=True)
-        q_next = self.predict(next_states, predict_all_actions=True)
+        q_curr = self.predict(
+            curr_states, convert_to_openai_action_space=False, predict_all_actions=True
+        )  # network q-value predictions for current state
+        q_next = self.predict(
+            next_states, convert_to_openai_action_space=False, predict_all_actions=True
+        )  # network q-value predictions for next state
         for x, qc, qn in zip(batch, q_curr, q_next):
-            max_q = np.max(qn)
-            qc[np.where(qn == max_q)] = x.reward + self.discount_factor * max_q
+            max_q = np.max(
+                qn
+            )  # max expected reward if optimal policy is followed from subsequent step
+            if x.last_episode_state:
+                qc[self.openaiaction_to_nn_output[x.action]] = x.reward
+            else:
+                qc[self.openaiaction_to_nn_output[x.action]] = (
+                    x.reward + self.discount_factor * max_q
+                )  # GT for current sample contains the current n/w prediction for all other actions
 
-        callback = KerasCallBack(batch_idx, self.writer)
+        # callback to write out TB logs
+        tb_callback = KerasTBCallBack(batch_idx, self.writer)
 
         # update weights
         curr_states = np.stack([v.current_state for v in batch], axis=0)
@@ -112,15 +131,25 @@ class KerasNetwork(Network):
             y=q_curr,
             batch_size=len(batch),
             epochs=1,
-            callbacks=[callback],
+            callbacks=[tb_callback],
+            verbose=0,
         )
 
-    def predict(self, state: List[np.ndarray], predict_all_actions=False):
+    def predict(
+        self,
+        state: List[np.ndarray],
+        convert_to_openai_action_space=True,
+        predict_all_actions=False,
+    ):
         nw_op = self.model.predict(x=state, batch_size=state.shape[0])
         if predict_all_actions:
+            assert convert_to_openai_action_space == False
             return nw_op
 
-        return np.argmax(nw_op)
+        if convert_to_openai_action_space:
+            return self.env_action_space[np.argmax(nw_op)]
+        else:
+            return np.argmax(nw_op)
 
     def save(self, chkpt_folder, epi_cnt):
         self.model.save_weights(os.path.join(chkpt_folder, f"checkpoint_{epi_cnt}"))

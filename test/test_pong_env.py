@@ -12,12 +12,10 @@ def test_pong():
     done = False
     frame_cnt = 1
     while not done:
-        # env.render()
-        img, reward, done, info = env.step(
-            env.action_space.sample()
-        )  # take a random action
+        env.render()
+        img, reward, done, info = env.step(5)  # take a random action
         print(f"reward : {reward}, done : {done}")
-        skimage.io.imsave(f"img_{frame_cnt}.png", img)
+        # skimage.io.imsave(f"img_{frame_cnt}.png", img)
         frame_cnt += 1
     env.close()
 

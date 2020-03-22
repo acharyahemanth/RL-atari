@@ -13,6 +13,7 @@ class TrainingSample:
     )  # set of images concatenated along axis-2 (h x w x n)
     action: int = -1  # action taken by network for current_state
     reward: float = 0  # reward rxd for action
+    last_episode_state: bool = False  # if true, episode ended because of action taken in the current state
     next_state: np.ndarray = np.array([])  # next state after taking action
 
 
@@ -26,11 +27,18 @@ class Network(ABC):
         num_actions: int,
         discount_factor: float,
         tb_logdir: str,
+        env_action_space: List[int],
+        tb_writer,
     ):
         assert False
 
     @abstractmethod
-    def predict(self, state: List[np.ndarray], predict_all_actions=False):
+    def predict(
+        self,
+        state: List[np.ndarray],
+        convert_to_openai_action_space=True,
+        predict_all_actions=False,
+    ):
         """ if predict_all_actions is true, it returns the output of the network directly (np.ndarray(num_actions), else it returns a single number corresponding to the action with the largest Q value)"""
         assert False
 
