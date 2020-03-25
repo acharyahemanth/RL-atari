@@ -26,9 +26,6 @@ class TrainingManager(object):
         self.training_config["outputs"]["dump_training_samples"] = (
             self.training_config["outputs"]["dump_training_samples"] == "True"
         )
-        self.training_config["outputs"]["save_weights"] = (
-            self.training_config["outputs"]["save_weights"] == "True"
-        )
 
         # create folder to dump out debug data
         if os.path.exists(self.training_config["outputs"]["output_folder"]):
@@ -50,7 +47,7 @@ class TrainingManager(object):
         self.writer = tf.summary.create_file_writer(self.output_folders["tb_logs"])
 
         # create folder to dump checkpoints
-        if self.training_config["outputs"]["save_weights"]:
+        if self.training_config["outputs"]["weights_dump_episode_frequency"] > 0:
             self.output_folders["weights"] = os.path.join(
                 self.training_config["outputs"]["output_folder"], "weights"
             )
@@ -83,6 +80,7 @@ class TrainingManager(object):
 
         # training batch index
         batch_idx = 0
+        # self.play_game(env, net, env_action_space, batch_idx)
 
         def get_eps(batch_idx):
             """ given a batch index, returns the epsilon for greedy exploration"""
@@ -135,12 +133,45 @@ class TrainingManager(object):
                     self.writer.flush()
 
             if (
-                self.training_config["outputs"]["save_weights"]
+                self.training_config["outputs"]["weights_dump_episode_frequency"] > 0
                 and epi_cnt
                 % self.training_config["outputs"]["weights_dump_episode_frequency"]
                 == 0
             ):
                 net.save(self.output_folders["weights"], epi_cnt)
 
-            # if(epi_cnt % self.training_config['eval_frequency']==0):
-            #     net.evaluate(env)
+            if (
+                self.training_config["outputs"]["test_game_episode_frequency"] > 0
+                and epi_cnt
+                % self.training_config["outputs"]["test_game_episode_frequency"]
+                == 0
+            ):
+                self.play_game(env, net, env_action_space, batch_idx)
+
+    def play_game(self, env, net, env_action_space, batch_idx):
+        """ plays a game and saves the video """
+
+        replay_memory = ReplayMemory(
+            ReplayMemoryConfig(
+                buffer_size=self.training_config["replay_buffer"]["state_size"],
+                state_size=self.training_config["replay_buffer"]["state_size"],
+                batch_size=1,
+                dbg_folder_path=None,
+            )
+        )
+        done = False
+        img = env.reset()
+        games_played = 0
+        agent_score = 0
+        while not done:
+            state = self.replay_memory.gen_next_state(img)
+            if state is not None:
+                action = net.predict(np.expand_dims(state, axis=0))
+            else:
+                action = np.random.choice(env_action_space)
+            img, reward, done, info = env.step(action)
+            if reward > 0:
+                agent_score += 1
+
+        with self.writer.as_default():
+            tf.summary.scalar("agent_score", agent_score, step=batch_idx)

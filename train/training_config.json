@@ -19,8 +19,8 @@
     "outputs" :
     {
         "output_folder": "../outputs",
-        "dump_training_samples": "False",
-        "save_weights": "False",
-        "weights_dump_episode_frequency": 10
+        "dump_training_samples": "False",        
+        "weights_dump_episode_frequency": 10,
+        "test_game_episode_frequency" : 1
     }
 }
