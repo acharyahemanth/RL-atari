@@ -164,7 +164,7 @@ class TrainingManager(object):
         games_played = 0
         agent_score = 0
         while not done:
-            state = self.replay_memory.gen_next_state(img)
+            state = replay_memory.gen_next_state(img)
             if state is not None:
                 action = net.predict(np.expand_dims(state, axis=0))
             else:
