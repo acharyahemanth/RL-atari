@@ -120,6 +120,10 @@ class ReplayMemory(object):
                         for i in range(idx + 1 - self._config.state_size, idx + 1)
                     ]
                 )
+            else:
+                ts.next_state = np.dstack(
+                    self._config.state_size * [self._ring_buffer[idx].img]
+                )  # creating a dummy next state
             return ts
 
         # generate random indices from state_size-1 : buffersize-state_size
