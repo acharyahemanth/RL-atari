@@ -94,7 +94,7 @@ class ReplayMemory(object):
         Returns a list of samples for training
         Returns None if insufficent samples
         """
-        # first (n-1) elements dont have history, last element only contains image
+        # first (n-1) elements dont have history, last element doesnt contain next image
         if (
             len(self._ring_buffer) - (self._config.state_size - 1) - 1
             < self._config.state_size * self._config.batch_size
@@ -103,30 +103,32 @@ class ReplayMemory(object):
 
         def make_sample(idx):
             """ makes a training sample combining images from idx -> idx-state_size """
+
+            def make_state(index):
+                """ makes a state from [index-(state_size-1) : index] """
+                start = index - (self._config.state_size - 1)
+                end = index
+                return np.dstack(
+                    [
+                        self._ring_buffer[i].img
+                        for i in range(start, end + 1)  # start and end is inclusive
+                    ]
+                )
+
             ts = TrainingSample()
-            ts.current_state = np.dstack(
-                [
-                    self._ring_buffer[i].img
-                    for i in range(idx - self._config.state_size, idx)
-                ]
-            )
+            ts.current_state = make_state(idx)
             ts.action = self._ring_buffer[idx].action
             ts.reward = self._ring_buffer[idx].reward
             ts.last_episode_state = self._ring_buffer[idx].done
             if not self._ring_buffer[idx].done:
-                ts.next_state = np.dstack(
-                    [
-                        self._ring_buffer[i].img
-                        for i in range(idx + 1 - self._config.state_size, idx + 1)
-                    ]
-                )
+                ts.next_state = make_state(idx + 1)
             else:
                 ts.next_state = np.dstack(
                     self._config.state_size * [self._ring_buffer[idx].img]
                 )  # creating a dummy next state
             return ts
 
-        # generate random indices from state_size-1 : buffersize-state_size
+        # generate random indices from state_size-1 : buffersize-2 (last element doesnt have next_image)
         batch_indices = np.random.randint(
             self._config.state_size - 1,
             len(self._ring_buffer) - 1,
